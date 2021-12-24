@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <tchar.h>
+#include <winuser.h>
 
 // Global variables
 
@@ -16,8 +17,11 @@ static TCHAR szTitle[] = _T("Windows Desktop Guided Tour Application");
 
 HINSTANCE hInst;
 
+UINT_PTR IDT_MOUSETRAP;
+
 // Forward declarations of functions included in this code module:
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+VOID CALLBACK MyTimerProc(HWND hwnd, UINT message, UINT idTimer, DWORD dwTime);
 
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
@@ -71,7 +75,7 @@ int WINAPI WinMain(
         szTitle,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        500, 100,
+        700, 100,
         NULL,
         NULL,
         hInstance,
@@ -87,6 +91,22 @@ int WINAPI WinMain(
 
         return 1;
     }
+
+    UINT uResult = SetTimer(hWnd,             // handle to main window 
+        IDT_MOUSETRAP,                   // timer identifier 
+        1000 * 60 * 5,                           // interval 
+        (TIMERPROC)MyTimerProc);               // no timer callback 
+
+    if (uResult == 0)
+    {
+        MessageBox(NULL,
+            _T("No timer is available.!"),
+            _T("Windows Desktop Guided Tour"),
+            NULL);
+
+        return 1;
+    }
+
 
     // The parameters to ShowWindow explained:
     // hWnd: the value returned from CreateWindow
@@ -116,7 +136,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     PAINTSTRUCT ps;
     HDC hdc;
-    TCHAR greeting[] = _T("Hello, Windows desktop!");
+    TCHAR greeting[] = _T("After minimize this window, generate mouse click event intervaly at current position!");
 
     switch (message)
     {
@@ -127,13 +147,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // For this introduction, we just print out "Hello, Windows desktop!"
         // in the top left corner.
         TextOut(hdc,
-            5, 5,
+            10, 10,
             greeting, _tcslen(greeting));
         // End application-specific layout section.
 
         EndPaint(hWnd, &ps);
         break;
     case WM_DESTROY:
+        KillTimer(hWnd, IDT_MOUSETRAP);
+
         PostQuitMessage(0);
         break;
     default:
@@ -142,4 +164,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
 
     return 0;
+}
+
+// MyTimerProc is an application-defined callback function that 
+// processes WM_TIMER messages. 
+
+VOID CALLBACK MyTimerProc(
+    HWND hwnd,        // handle to window for timer messages 
+    UINT message,     // WM_TIMER message 
+    UINT idTimer,     // timer identifier 
+    DWORD dwTime)     // current system time 
+{
+
+    INPUT Inputs[2] = { 0 };
+
+    RECT rc;
+    POINT pt;
+
+    // If the window is minimized, compare the current 
+    // cursor position with the one from 10 seconds earlier. 
+    // If the cursor position has not changed, move the 
+    // cursor to the icon. 
+
+    if (IsIconic(hwnd))
+    {
+        Inputs[0].type = INPUT_MOUSE;
+        Inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+        Inputs[1].type = INPUT_MOUSE;
+        Inputs[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+        SendInput(2, Inputs, sizeof(INPUT));
+    }
 }
